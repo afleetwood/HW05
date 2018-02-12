@@ -7,22 +7,23 @@ export default function run_memory(root) {
 }
 
 function Tile(params) {
-  var showing = params.flipped ? 'showing' : 'hidden';
+  var matched = params.status === "matched";
+  var showing = params.status === "matched" || params.status === "flipped";
 
-  if(params.matched) {
+  if(matched) {
     return (
         <button className="match-tile">{params.value}</button>
     );
   }
   else {
-    if (params.flipped) {
+    if (showing) {
       return (
-          <button className={showing} onClick={params.handleClick.bind(this)}>{params.value}</button>      
+          <button className="showing-tile" onClick={params.handleClick.bind(this)}>{params.value}</button>      
       );
     }
     else {
       return (
-          <button className={showing} onClick={params.handleClick.bind(this)}></button> 
+          <button className="hidden-tile" onClick={params.handleClick.bind(this)}></button> 
       );
     }
   }
@@ -31,150 +32,60 @@ function Tile(params) {
 class Grid extends React.Component {
   constructor(props) {
     super(props);
+
+    this.channel = props.channel;
+  
     this.state = {
-      tiles: this.initializeGrid(),
-      guessTiles: [],
-      matchTiles: [],
+      tiles: [],
       score: 0,
+      wait: false,
     }
+
+    this.channel.join()
+	.receive("ok", receiveView.bind(this))
+	.receive("error", output => { console.log("Unable to join channel", output) });
   }
 
   /* ----- GAME FUNCTIONS ----- */
 
-  initializeGrid() {
-    var grid = [
-      {value: 'A', flipped: false, matched: false},
-      {value: 'A', flipped: false, matched: false},
-      {value: 'B', flipped: false, matched: false},
-      {value: 'B', flipped: false, matched: false},
-      {value: 'C', flipped: false, matched: false},
-      {value: 'C', flipped: false, matched: false},
-      {value: 'D', flipped: false, matched: false},
-      {value: 'D', flipped: false, matched: false},
-      {value: 'E', flipped: false, matched: false},
-      {value: 'E', flipped: false, matched: false},
-      {value: 'F', flipped: false, matched: false},
-      {value: 'F', flipped: false, matched: false},
-      {value: 'G', flipped: false, matched: false},
-      {value: 'G', flipped: false, matched: false},
-      {value: 'H', flipped: false, matched: false},
-      {value: 'H', flipped: false, matched: false}
-    ];
-
-    var temp;
-    var index;
-    for (var i = 0; i < 16; i++) {
-      index = Math.floor(Math.random() * 16);
-      temp = grid[i];
-      grid[i] = grid[index];
-      grid[index] = temp;
+  receiveView(view) {
+    console.log("View received", view);
+    if (view.game.wait) {
+      setTimeout(function() {
+	this.channel.push("undo_guesses").receive("ok", this.receiveView.bind(this), 1000);
+      });
     }
-
-    return grid;
-  }
-
-  handleClick(i) {
-    var tiles = this.state.tiles.slice();
-    var score = this.state.score;
-
-    if (this.gameWon(tiles)) {
-      return;
-    }
-
-    if (!tiles[i].matched) {
-      // increment the click score
-      score = score + 1;
-      // indicate tile's value is visible
-      tiles[i].flipped = true;
-      // add this tile to the current guess
-      this.state.guessTiles.push({tile: tiles[i], index: i});
-
-      // if two tiles are flipped, evaluate the guess
-      if (this.state.guessTiles.length == 2) {
-	// let the user see tiles for 1 sec before ievaluation
-	window.setTimeout(this.evaluateGuess.bind(this), 1000);
-      }
-
-      // set the new state
-      this.setState({
-	tiles: tiles,
-        guessTiles: this.state.guessTiles,
-        matchTiles: this.state.matchTiles,
-        score: score
-      })
-    } else {
-      // maybe a message about clicking a matched tile
-    }
-  }
-
-  /* - Called when this.state.guessTiles holds two objects
-     - Determines whether the values of the two objects are equal
-  */
-  evaluateGuess() {
-    const guessTiles = this.state.guessTiles.slice();
-    const matchTiles = this.state.matchTiles.slice();
-
-    // determine a match
-    if (guessTiles[0].tile.value === guessTiles[1].tile.value) {
-      // yes match
-      // add tiles to correct match array, remove guesses
-      for (var i = 0; i < 2; i++) {
-        this.state.tiles[guessTiles[i].index].matched = true;
-      }
-      for (var i = 0; i < 2; i++) {
-        matchTiles.push(guessTiles.shift());
-      }
-    }
-    else {
-      // no match
-      // flip tiles to hidden state, remove guesses
-      for (var i = 0; i < 2; i++) {
-	this.state.tiles[guessTiles[i].index].flipped = false;
-      }
-      
-    }
-
     this.setState({
-      tiles: this.state.tiles,
-      guessTiles: [],
-      matchTiles: matchTiles,
-      score: this.state.score
+      tiles: view.game.tiles,
+      score: view.game.score,
+      wait: view.game.wait,
     });
-    return;
   }
-  
-  gameWon() {
-    return this.state.matchTiles.length == 16;
+
+  handleClick(tile) {
+    waiting = this.state.wait;
+
+    if(!waiting) {
+      this.channel.push("click", { tileKey: tile.key })
+	.receive("ok", this.receiveView.bind(this));
+    }
   }
 
   restartGame() {
-    this.setState({
-      tiles: this.initializeGrid(),
-      guessTiles: [],
-      matchTiles: [],
-      score: 0,
-    });
+    this.channel.push("restartGame").receive("ok", this.receiveView.bind(this));
   }
 
   /* ----- RENDERING FUNCTIONS ----- */
 
   renderTile(i) {
     var tiles = this.state.tiles.slice();
-    return <Tile value={tiles[i].value} flipped={tiles[i].flipped} matched={tiles[i].matched} handleClick={this.handleClick.bind(this, i)} />;
+    return <Tile value={tiles[i].value} status={tiles[i].status} handleClick={this.handleClick.bind(this, i)} />;
   }
 
   render() {
-    const wonYet = this.gameWon(this.state.matchTiles);
-    let status;
-    if (wonYet) {
-      status = 'You won! Your matching efficiency: ' + (16 / this.state.score * 100) + '%';
-    } else {
-      status = 'Number of clicks: ' + (this.state.score);
-    }
-
     return (
       <div>
-        <div className="status">{status}</div>
+        <div className="game-message">"Memory Matching Game"</div>
         <div className="grid-row">
           {this.renderTile(0)}
           {this.renderTile(1)}
