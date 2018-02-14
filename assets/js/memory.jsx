@@ -2,34 +2,11 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { Button } from 'reactstrap';
 
-export default function run_memory(root) {
-  ReactDOM.render(<Grid />, root);
+export default function run_memory(root, channel) {
+  ReactDOM.render(<Game channel={channel} />, root);
 }
 
-function Tile(params) {
-  var matched = params.status === "matched";
-  var showing = params.status === "matched" || params.status === "flipped";
-
-  if(matched) {
-    return (
-        <button className="match-tile">{params.value}</button>
-    );
-  }
-  else {
-    if (showing) {
-      return (
-          <button className="showing-tile" onClick={params.handleClick.bind(this)}>{params.value}</button>      
-      );
-    }
-    else {
-      return (
-          <button className="hidden-tile" onClick={params.handleClick.bind(this)}></button> 
-      );
-    }
-  }
-}
-
-class Grid extends React.Component {
+class Game extends React.Component {
   constructor(props) {
     super(props);
 
@@ -42,7 +19,7 @@ class Grid extends React.Component {
     }
 
     this.channel.join()
-	.receive("ok", receiveView.bind(this))
+	.receive("ok", this.receiveView.bind(this))
 	.receive("error", output => { console.log("Unable to join channel", output) });
   }
 
@@ -78,37 +55,43 @@ class Grid extends React.Component {
   /* ----- RENDERING FUNCTIONS ----- */
 
   renderTile(i) {
-    var tiles = this.state.tiles.slice();
-    return <Tile value={tiles[i].value} status={tiles[i].status} handleClick={this.handleClick.bind(this, i)} />;
+    let tile = this.state.tiles[i];
+
+    return(
+      <button className="tile" onClick={() => this.handleClick(tile)}> </button>
+    );
   }
 
   render() {
+    let score = this.state.score;
+
     return (
       <div>
-        <div className="game-message">"Memory Matching Game"</div>
+        <div className="game-message">Memory Matching Game</div>
+	<div className="game-score">Clicks: {score}</div>
         <div className="grid-row">
-          {this.renderTile(0)}
-          {this.renderTile(1)}
-          {this.renderTile(2)}
-          {this.renderTile(3)}
+	  {this.renderTile(0)}
+	  {this.renderTile(1)}
+	  {this.renderTile(2)}
+	  {this.renderTile(3)}
         </div>
         <div className="grid-row">
-          {this.renderTile(4)}
-          {this.renderTile(5)}
-          {this.renderTile(6)}
-          {this.renderTile(7)}
+	  {this.renderTile(4)}
+	  {this.renderTile(5)}
+	  {this.renderTile(6)}
+	  {this.renderTile(7)}
         </div>
         <div className="grid-row">
-          {this.renderTile(8)}
-          {this.renderTile(9)}
-          {this.renderTile(10)}
-          {this.renderTile(11)}
+	  {this.renderTile(8)}
+	  {this.renderTile(9)}
+	  {this.renderTile(10)}
+	  {this.renderTile(11)}
         </div>
         <div className="grid-row">
-          {this.renderTile(12)}
-          {this.renderTile(13)}
-          {this.renderTile(14)}
-          {this.renderTile(15)}
+	  {this.renderTile(12)}
+	  {this.renderTile(13)}
+	  {this.renderTile(14)}
+	  {this.renderTile(15)}
         </div>
         <br />
         <div>
@@ -122,17 +105,3 @@ class Grid extends React.Component {
     );
   }
 }
-
-class Game extends React.Component {
-  render() {
-    return(
-      <div className="memory-game">
-        <div className="memory-grid">
-          <Grid />
-        </div>
-      </div>
-    );
-  }
-}
-
-

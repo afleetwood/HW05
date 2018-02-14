@@ -134,7 +134,7 @@ defmodule Memory.Game do
     }
 
     newTiles = Map.put(game.tiles, tile1.key, hideTile1)
-      |> Map.put(game.tiles, tile2.key, hideTile2)
+      |> Map.put(tile2.key, hideTile2)
 
     Map.put(game, :tiles, newTiles)
       |> Map.put(:wait, false)
